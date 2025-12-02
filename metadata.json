@@ -1,0 +1,5 @@
+{
+  "name": "Apartment Expense Tracker",
+  "description": "A comprehensive tool to track apartment maintenance credits and debits, manage transactions, and export reports in CSV and PDF formats.",
+  "requestFramePermissions": []
+}
