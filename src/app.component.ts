@@ -2,10 +2,6 @@ import { Component, ChangeDetectionStrategy, signal, computed, effect, WritableS
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 
-// These declarations are needed for dynamically loaded scripts (jsPDF)
-declare var jsPDF: any;
-declare var autoTable: any;
-
 // --- DATA INTERFACE ---
 interface Transaction {
   id: number;
@@ -31,16 +27,16 @@ interface Transaction {
         <section class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
           <div class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-md">
             <h2 class="text-lg font-semibold text-zinc-500 mb-2">Total Credit</h2>
-            <p class="text-3xl font-bold text-green-600">{{ totalCredit() | currency:'USD' }}</p>
+            <p class="text-3xl font-bold text-green-600">{{ totalCredit() | currency:'INR' }}</p>
           </div>
           <div class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-md">
             <h2 class="text-lg font-semibold text-zinc-500 mb-2">Total Debit</h2>
-            <p class="text-3xl font-bold text-red-600">{{ totalDebit() | currency:'USD' }}</p>
+            <p class="text-3xl font-bold text-red-600">{{ totalDebit() | currency:'INR' }}</p>
           </div>
           <div class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-md">
             <h2 class="text-lg font-semibold text-zinc-500 mb-2">Current Balance</h2>
             <p class="text-3xl font-bold" [class.text-blue-600]="balance() >= 0" [class.text-red-600]="balance() < 0">
-              {{ balance() | currency:'USD' }}
+              {{ balance() | currency:'INR' }}
             </p>
           </div>
         </section>
@@ -148,7 +144,7 @@ interface Transaction {
                           <td class="p-4">{{ tx.date }}</td>
                           <td class="p-4">{{ tx.description }}</td>
                           <td class="p-4 text-right font-mono" [class.text-green-600]="tx.type === 'credit'" [class.text-red-600]="tx.type === 'debit'">
-                            {{ (tx.type === 'credit' ? '+' : '-') }} {{ tx.amount | currency:'USD' }}
+                            {{ (tx.type === 'credit' ? '+' : '-') }} {{ tx.amount | currency:'INR' }}
                           </td>
                           <td class="p-4 text-center">
                             <button (click)="deleteTransaction(tx.id)" class="text-zinc-400 hover:text-red-500 transition-colors duration-200">
@@ -173,7 +169,7 @@ interface Transaction {
                       </div>
                       <div class="text-right ml-4">
                         <p class="font-bold text-lg" [class.text-green-600]="tx.type === 'credit'" [class.text-red-600]="tx.type === 'debit'">
-                          {{ (tx.type === 'credit' ? '+' : '-') }} {{ tx.amount | currency }}
+                          {{ (tx.type === 'credit' ? '+' : '-') }} {{ tx.amount | currency:'INR' }}
                         </p>
                       </div>
                        <button (click)="deleteTransaction(tx.id)" class="text-zinc-400 hover:text-red-500 transition-colors duration-200 ml-4">
@@ -287,25 +283,29 @@ export class AppComponent {
     try {
       await this.loadJsPDF();
       
+      const { jsPDF } = (window as any).jspdf;
       const doc = new jsPDF();
+
+      // Helper for number formatting to avoid font issues with '₹'
+      const formatAsINR = (amount: number) => `INR ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       
       doc.setFontSize(22);
       doc.text('Apartment Expense Report', 14, 20);
       
       doc.setFontSize(12);
-      doc.text(`Total Credit: ${this.totalCredit().toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`, 14, 30);
-      doc.text(`Total Debit: ${this.totalDebit().toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`, 14, 36);
-      doc.text(`Current Balance: ${this.balance().toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`, 14, 42);
+      doc.text(`Total Credit: ${formatAsINR(this.totalCredit())}`, 14, 30);
+      doc.text(`Total Debit: ${formatAsINR(this.totalDebit())}`, 14, 36);
+      doc.text(`Current Balance: ${formatAsINR(this.balance())}`, 14, 42);
 
       const head = [['Date', 'Description', 'Type', 'Amount']];
       const body = this.sortedTransactions().map(tx => [
         tx.date,
         tx.description,
         tx.type,
-        (tx.type === 'credit' ? '+' : '-') + tx.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+        `${tx.type === 'credit' ? '+' : '-'} ${formatAsINR(tx.amount)}`
       ]);
       
-      autoTable(doc, {
+      (doc as any).autoTable({
         head: head,
         body: body,
         startY: 50,
@@ -313,7 +313,8 @@ export class AppComponent {
         didDrawCell: (data: any) => {
           if (data.section === 'body' && data.column.index === 3) {
             const text = data.cell.raw as string;
-            doc.setTextColor(text.startsWith('+') ? '#16a34a' : '#dc2626'); // green-600 / red-600
+            // Check for the sign, not the currency symbol
+            doc.setTextColor(text.trim().startsWith('+') ? '#16a34a' : '#dc2626'); // green-600 / red-600
           }
         },
       });
@@ -417,7 +418,8 @@ export class AppComponent {
 
   private loadJsPDF(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (typeof jsPDF !== 'undefined' && typeof autoTable !== 'undefined') {
+      const win = window as any;
+      if (win.jspdf && win.jspdf.jsPDF.prototype.autoTable) {
         return resolve();
       }
 
