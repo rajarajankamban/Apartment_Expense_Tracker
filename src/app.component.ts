@@ -25,17 +25,17 @@ interface Transaction {
 
         <!-- Summary Cards -->
         <section class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-          <div class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-md">
-            <h2 class="text-lg font-semibold text-zinc-500 mb-2">Total Credit</h2>
-            <p class="text-3xl font-bold text-green-600">{{ totalCredit() | currency:'INR' }}</p>
+          <div class="bg-white p-4 sm:p-6 rounded-2xl border border-zinc-200 shadow-md sm:block flex items-center justify-between">
+            <h2 class="text-base sm:text-lg font-semibold text-zinc-500 sm:mb-2">Total Credit</h2>
+            <p class="text-xl sm:text-3xl font-bold text-green-600">{{ totalCredit() | currency:'INR' }}</p>
           </div>
-          <div class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-md">
-            <h2 class="text-lg font-semibold text-zinc-500 mb-2">Total Debit</h2>
-            <p class="text-3xl font-bold text-red-600">{{ totalDebit() | currency:'INR' }}</p>
+          <div class="bg-white p-4 sm:p-6 rounded-2xl border border-zinc-200 shadow-md sm:block flex items-center justify-between">
+            <h2 class="text-base sm:text-lg font-semibold text-zinc-500 sm:mb-2">Total Debit</h2>
+            <p class="text-xl sm:text-3xl font-bold text-red-600">{{ totalDebit() | currency:'INR' }}</p>
           </div>
-          <div class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-md">
-            <h2 class="text-lg font-semibold text-zinc-500 mb-2">Current Balance</h2>
-            <p class="text-3xl font-bold" [class.text-blue-600]="balance() >= 0" [class.text-red-600]="balance() < 0">
+          <div class="bg-white p-4 sm:p-6 rounded-2xl border border-zinc-200 shadow-md sm:block flex items-center justify-between">
+            <h2 class="text-base sm:text-lg font-semibold text-zinc-500 sm:mb-2">Current Balance</h2>
+            <p class="text-xl sm:text-3xl font-bold" [class.text-blue-600]="balance() >= 0" [class.text-red-600]="balance() < 0">
               {{ balance() | currency:'INR' }}
             </p>
           </div>
@@ -52,10 +52,10 @@ interface Transaction {
               <h2 class="text-2xl font-bold text-zinc-900 mb-4">New Transaction</h2>
               <form [formGroup]="transactionForm" (ngSubmit)="addTransaction()" class="space-y-4">
                 <div>
-                  <label for="date" class="block text-sm font-medium text-zinc-600">Date</label>
+                  <label for="date" class="block text-base font-medium text-zinc-600">Date</label>
                   <div class="relative mt-1">
-                    <input id="date" type="date" formControlName="date" class="appearance-none block w-full bg-zinc-100 border-zinc-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-zinc-800 p-2 pr-10">
-                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <input #dateInput id="date" type="date" formControlName="date" class="text-base appearance-none block w-full bg-zinc-100 border-zinc-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-zinc-800 p-2 pr-10">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" (click)="dateInput.showPicker()">
                        <svg class="h-5 w-5 text-zinc-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                          <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd" />
                        </svg>
@@ -63,28 +63,28 @@ interface Transaction {
                   </div>
                 </div>
                 <div>
-                  <label for="description" class="block text-sm font-medium text-zinc-600">Description</label>
-                  <input id="description" type="text" formControlName="description" placeholder="e.g., Monthly Rent" class="mt-1 block w-full bg-zinc-100 border-zinc-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-zinc-800 p-2">
+                  <label for="description" class="block text-base font-medium text-zinc-600">Description</label>
+                  <input id="description" type="text" formControlName="description" placeholder="e.g., Monthly Rent" class="text-base mt-1 block w-full bg-zinc-100 border-zinc-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-zinc-800 p-2">
                 </div>
                 <div>
-                  <label for="amount" class="block text-sm font-medium text-zinc-600">Amount</label>
-                  <input id="amount" type="number" formControlName="amount" placeholder="0.00" class="mt-1 block w-full bg-zinc-100 border-zinc-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-zinc-800 p-2">
+                  <label for="amount" class="block text-base font-medium text-zinc-600">Amount</label>
+                  <input id="amount" type="number" formControlName="amount" placeholder="0.00" class="text-base mt-1 block w-full bg-zinc-100 border-zinc-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-zinc-800 p-2">
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-zinc-600">Type</label>
+                  <label class="block text-base font-medium text-zinc-600">Type</label>
                   <div class="mt-2 grid grid-cols-2 gap-3">
                     <button type="button" (click)="transactionForm.controls['type'].setValue('credit')" 
                             [class.bg-green-500]="transactionForm.value.type === 'credit'" 
                             [class.text-white]="transactionForm.value.type === 'credit'"
                             [class.bg-zinc-200]="transactionForm.value.type !== 'credit'"
-                            class="w-full font-semibold py-2 px-4 rounded-md transition-colors duration-200 hover:bg-green-400/50">
+                            class="w-full text-base font-semibold py-2 px-4 rounded-md transition-colors duration-200 hover:bg-green-400/50">
                       Credit
                     </button>
                     <button type="button" (click)="transactionForm.controls['type'].setValue('debit')" 
                             [class.bg-red-500]="transactionForm.value.type === 'debit'"
                             [class.text-white]="transactionForm.value.type === 'debit'"
                             [class.bg-zinc-200]="transactionForm.value.type !== 'debit'"
-                            class="w-full font-semibold py-2 px-4 rounded-md transition-colors duration-200 hover:bg-red-400/50">
+                            class="w-full text-base font-semibold py-2 px-4 rounded-md transition-colors duration-200 hover:bg-red-400/50">
                       Debit
                     </button>
                   </div>
@@ -96,7 +96,7 @@ interface Transaction {
             </section>
 
             <!-- Actions: Import/Export -->
-            <section class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-md flex flex-col">
+            <section class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-md">
               <h2 class="text-2xl font-bold text-zinc-900 mb-4">Data Management</h2>
               <div class="flex flex-col sm:flex-row gap-4 mb-4">
                 <button (click)="exportCSV()" class="flex-1 bg-teal-600 text-white font-bold py-3 px-4 rounded-md hover:bg-teal-700 transition-colors duration-200">Export as CSV</button>
@@ -108,12 +108,21 @@ interface Transaction {
                   }
                 </button>
               </div>
-              <div class="flex-1 border-2 border-dashed border-zinc-300 rounded-md p-4 flex flex-col items-center justify-center">
+              <div class="flex-1 border-2 border-dashed border-zinc-300 rounded-md p-4 flex flex-col items-center justify-center mb-6">
                 <label for="csv-import" class="w-full cursor-pointer bg-zinc-600 text-white font-bold py-3 px-4 rounded-md hover:bg-zinc-700 transition-colors duration-200 text-center">
                   Import from CSV (Replace)
                 </label>
                 <input id="csv-import" type="file" (change)="onFileSelected($event)" accept=".csv" class="hidden">
                 <p class="text-sm text-zinc-500 mt-2">This will replace all current data.</p>
+              </div>
+              
+              <!-- Destructive Actions -->
+              <div>
+                <h3 class="text-lg font-semibold text-zinc-700 mb-2">Danger Zone</h3>
+                <button (click)="resetData()" class="w-full bg-red-600 text-white font-bold py-3 px-4 rounded-md hover:bg-red-700 transition-colors duration-200">
+                  Reset All Data
+                </button>
+                <p class="text-sm text-zinc-500 mt-2">This will permanently delete all transactions.</p>
               </div>
             </section>
           </div>
@@ -251,6 +260,12 @@ export class AppComponent {
 
   deleteTransaction(id: number): void {
     this.transactions.update(current => current.filter(t => t.id !== id));
+  }
+
+  resetData(): void {
+    if (confirm('Are you sure you want to delete all transactions? This action cannot be undone.')) {
+      this.transactions.set([]);
+    }
   }
 
   // --- LOCAL STORAGE ---
