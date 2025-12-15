@@ -119,10 +119,25 @@ interface Transaction {
               <!-- Destructive Actions -->
               <div>
                 <h3 class="text-lg font-semibold text-zinc-700 mb-2">Danger Zone</h3>
-                <button (click)="resetData()" class="w-full bg-red-600 text-white font-bold py-3 px-4 rounded-md hover:bg-red-700 transition-colors duration-200">
-                  Reset All Data
-                </button>
-                <p class="text-sm text-zinc-500 mt-2">This will permanently delete all transactions.</p>
+                @if (!confirmingReset()) {
+                  <button (click)="resetData()" class="w-full bg-red-600 text-white font-bold py-3 px-4 rounded-md hover:bg-red-700 transition-colors duration-200">
+                    Reset All Data
+                  </button>
+                  <p class="text-sm text-zinc-500 mt-2">This will permanently delete all transactions.</p>
+                } @else {
+                  <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md">
+                    <p class="font-bold mb-2">Are you sure?</p>
+                    <p class="text-sm">This action cannot be undone.</p>
+                  </div>
+                  <div class="mt-4 flex gap-4">
+                    <button (click)="confirmReset()" class="flex-1 bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200">
+                      Yes, Reset
+                    </button>
+                    <button (click)="cancelReset()" class="flex-1 bg-zinc-500 text-white font-bold py-2 px-4 rounded-md hover:bg-zinc-600 transition-colors duration-200">
+                      Cancel
+                    </button>
+                  </div>
+                }
               </div>
             </section>
           </div>
@@ -206,6 +221,7 @@ export class AppComponent {
   
   transactionForm: FormGroup;
   isPdfLoading = signal(false);
+  confirmingReset = signal(false);
 
   // --- COMPUTED SIGNALS for reactive calculations ---
   totalCredit = computed(() => this.transactions()
@@ -263,9 +279,16 @@ export class AppComponent {
   }
 
   resetData(): void {
-    if (confirm('Are you sure you want to delete all transactions? This action cannot be undone.')) {
-      this.transactions.set([]);
-    }
+    this.confirmingReset.set(true);
+  }
+
+  confirmReset(): void {
+    this.transactions.set([]);
+    this.confirmingReset.set(false);
+  }
+
+  cancelReset(): void {
+    this.confirmingReset.set(false);
   }
 
   // --- LOCAL STORAGE ---
@@ -296,50 +319,136 @@ export class AppComponent {
   async exportPDF(): Promise<void> {
     this.isPdfLoading.set(true);
     try {
-      await this.loadJsPDF();
-      
-      const { jsPDF } = (window as any).jspdf;
-      const doc = new jsPDF();
+        await this.loadJsPDF();
+        
+        const { jsPDF } = (window as any).jspdf;
+        const doc = new jsPDF();
+        const pageHeight = doc.internal.pageSize.height;
+        let finalY = 0; // Keep track of the vertical position
 
-      // Helper for number formatting to avoid font issues with '₹'
-      const formatAsINR = (amount: number) => `INR ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      
-      doc.setFontSize(22);
-      doc.text('Apartment Expense Report', 14, 20);
-      
-      doc.setFontSize(12);
-      doc.text(`Total Credit: ${formatAsINR(this.totalCredit())}`, 14, 30);
-      doc.text(`Total Debit: ${formatAsINR(this.totalDebit())}`, 14, 36);
-      doc.text(`Current Balance: ${formatAsINR(this.balance())}`, 14, 42);
+        // --- STYLING CONSTANTS ---
+        const HEADER_COLOR = '#27374D'; // Dark Blue
+        const CREDIT_COLOR = '#166534'; // Dark Green
+        const DEBIT_COLOR = '#991B1B';  // Dark Red
+        const PRIMARY_COLOR = '#1E40AF'; // Blue
+        const TEXT_COLOR = '#333333';
+        const SUBTLE_TEXT_COLOR = '#666666';
+        const BORDER_COLOR = '#DDDDDD';
+        const pageMargin = 14;
 
-      const head = [['Date', 'Description', 'Type', 'Amount']];
-      const body = this.sortedTransactions().map(tx => [
-        tx.date,
-        tx.description,
-        tx.type,
-        `${tx.type === 'credit' ? '+' : '-'} ${formatAsINR(tx.amount)}`
-      ]);
-      
-      (doc as any).autoTable({
-        head: head,
-        body: body,
-        startY: 50,
-        headStyles: { fillColor: [37, 99, 235] }, // blue-600
-        didDrawCell: (data: any) => {
-          if (data.section === 'body' && data.column.index === 3) {
-            const text = data.cell.raw as string;
-            // Check for the sign, not the currency symbol
-            doc.setTextColor(text.trim().startsWith('+') ? '#16a34a' : '#dc2626'); // green-600 / red-600
-          }
-        },
-      });
-      
-      doc.save(this.getExportFilename('pdf'));
+        // --- FORMATTERS ---
+        const formatAsINR = (amount: number) => `INR ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const generatedDate = new Date().toLocaleDateString('en-GB');
+
+        // --- PDF HEADER ---
+        doc.setFillColor(HEADER_COLOR);
+        doc.rect(0, 0, doc.internal.pageSize.width, 28, 'F');
+        doc.setFontSize(18);
+        doc.setTextColor('#FFFFFF');
+        doc.setFont('helvetica', 'bold');
+        doc.text('Aishwaryam Apartment Expense Report', pageMargin, 18);
+        
+        // --- SUMMARY SECTION ---
+        finalY = 40;
+        doc.setFontSize(10);
+        doc.setTextColor(SUBTLE_TEXT_COLOR);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Total Credit', pageMargin, finalY);
+        doc.text('Total Debit', 80, finalY);
+        doc.text('Current Balance', 145, finalY);
+        
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(CREDIT_COLOR);
+        doc.text(formatAsINR(this.totalCredit()), pageMargin, finalY + 7);
+        doc.setTextColor(DEBIT_COLOR);
+        doc.text(formatAsINR(this.totalDebit()), 80, finalY + 7);
+        doc.setTextColor(this.balance() >= 0 ? PRIMARY_COLOR : DEBIT_COLOR);
+        doc.text(formatAsINR(this.balance()), 145, finalY + 7);
+        
+        finalY += 15;
+        doc.setDrawColor(BORDER_COLOR);
+        doc.line(pageMargin, finalY, doc.internal.pageSize.width - pageMargin, finalY);
+        finalY += 10;
+        
+        // --- FILTER TRANSACTIONS ---
+        const creditTransactions = this.sortedTransactions().filter(tx => tx.type === 'credit');
+        const debitTransactions = this.sortedTransactions().filter(tx => tx.type === 'debit');
+
+        const addTable = (title: string, data: any[], color: string, startY: number) => {
+            doc.setFontSize(14);
+            doc.setTextColor(TEXT_COLOR);
+            doc.setFont('helvetica', 'bold');
+            doc.text(title, pageMargin, startY);
+
+            (doc as any).autoTable({
+                head: [['Date', 'Description', 'Amount']],
+                body: data,
+                startY: startY + 6,
+                theme: 'grid',
+                headStyles: { fillColor: color, textColor: '#FFFFFF' },
+                styles: { fontSize: 9, cellPadding: 2.5 },
+                columnStyles: { 2: { halign: 'right' } }
+            });
+            return (doc as any).autoTable.previous.finalY;
+        };
+
+        // --- CREDIT TABLE ---
+        if (creditTransactions.length > 0) {
+            const creditData = creditTransactions.map(tx => [tx.date, tx.description, formatAsINR(tx.amount)]);
+            finalY = addTable('Credit Transactions', creditData, CREDIT_COLOR, finalY) + 10;
+        }
+
+        // --- DEBIT TABLE ---
+        if (debitTransactions.length > 0) {
+            const debitData = debitTransactions.map(tx => [tx.date, tx.description, formatAsINR(tx.amount)]);
+            finalY = addTable('Debit Transactions', debitData, DEBIT_COLOR, finalY) + 10;
+        }
+        
+        // --- CONSOLIDATED HISTORY TABLE ---
+        if (this.sortedTransactions().length > 0) {
+            doc.setFontSize(14);
+            doc.setTextColor(TEXT_COLOR);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Consolidated Transaction History', pageMargin, finalY);
+
+            const allData = this.sortedTransactions().map(tx => [
+                tx.date,
+                tx.description,
+                tx.type.charAt(0).toUpperCase() + tx.type.slice(1),
+                `${tx.type === 'credit' ? '+' : '-'} ${formatAsINR(tx.amount)}`
+            ]);
+            
+            (doc as any).autoTable({
+                head: [['Date', 'Description', 'Type', 'Amount']],
+                body: allData,
+                startY: finalY + 6,
+                theme: 'grid',
+                headStyles: { fillColor: PRIMARY_COLOR, textColor: '#FFFFFF' },
+                styles: { fontSize: 9, cellPadding: 2.5 },
+                columnStyles: { 3: { halign: 'right' } },
+                didDrawCell: (data: any) => {
+                    if (data.section === 'body' && data.column.index === 3) {
+                        const text = data.cell.raw as string;
+                        doc.setTextColor(text.trim().startsWith('+') ? CREDIT_COLOR : DEBIT_COLOR);
+                    }
+                },
+                didDrawPage: (data: any) => {
+                    // --- FOOTER ---
+                    doc.setFontSize(8);
+                    doc.setTextColor(SUBTLE_TEXT_COLOR);
+                    doc.text(`Report generated on ${generatedDate}`, pageMargin, pageHeight - 10);
+                    doc.text(`Page ${data.pageNumber}`, doc.internal.pageSize.width - pageMargin, pageHeight - 10, { align: 'right' });
+                }
+            });
+        }
+        
+        doc.save(this.getExportFilename('pdf'));
     } catch (error) {
-      console.error('Failed to generate PDF:', error);
-      alert('Could not generate PDF. Please try again.');
+        console.error('Failed to generate PDF:', error);
+        alert('Could not generate PDF. Please try again.');
     } finally {
-      this.isPdfLoading.set(false);
+        this.isPdfLoading.set(false);
     }
   }
 
