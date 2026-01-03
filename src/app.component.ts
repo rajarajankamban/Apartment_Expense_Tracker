@@ -1,15 +1,7 @@
-import { Component, ChangeDetectionStrategy, signal, computed, effect, WritableSignal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, computed, WritableSignal, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-
-// --- DATA INTERFACE ---
-interface Transaction {
-  id: number;
-  date: string;
-  description: string;
-  amount: number;
-  type: 'credit' | 'debit';
-}
+import { Transaction, NewTransaction, TransactionService } from './transaction.service';
 
 @Component({
   selector: 'app-root',
@@ -26,15 +18,15 @@ interface Transaction {
         <!-- Summary Cards -->
         <section class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
           <div class="bg-white p-4 sm:p-6 rounded-2xl border border-zinc-200 shadow-md sm:block flex items-center justify-between">
-            <h2 class="text-base sm:text-lg font-semibold text-zinc-500 sm:mb-2">Total Credit</h2>
+            <h2 class="text-base sm:text-lg font-semibold text-zinc-500 sm:mb-2">Total Credit ({{ formatMonth(selectedMonth()) }})</h2>
             <p class="text-xl sm:text-3xl font-bold text-green-600">{{ totalCredit() | currency:'INR' }}</p>
           </div>
           <div class="bg-white p-4 sm:p-6 rounded-2xl border border-zinc-200 shadow-md sm:block flex items-center justify-between">
-            <h2 class="text-base sm:text-lg font-semibold text-zinc-500 sm:mb-2">Total Debit</h2>
+            <h2 class="text-base sm:text-lg font-semibold text-zinc-500 sm:mb-2">Total Debit ({{ formatMonth(selectedMonth()) }})</h2>
             <p class="text-xl sm:text-3xl font-bold text-red-600">{{ totalDebit() | currency:'INR' }}</p>
           </div>
           <div class="bg-white p-4 sm:p-6 rounded-2xl border border-zinc-200 shadow-md sm:block flex items-center justify-between">
-            <h2 class="text-base sm:text-lg font-semibold text-zinc-500 sm:mb-2">Current Balance</h2>
+            <h2 class="text-base sm:text-lg font-semibold text-zinc-500 sm:mb-2">Balance ({{ formatMonth(selectedMonth()) }})</h2>
             <p class="text-xl sm:text-3xl font-bold" [class.text-blue-600]="balance() >= 0" [class.text-red-600]="balance() < 0">
               {{ balance() | currency:'INR' }}
             </p>
@@ -95,10 +87,10 @@ interface Transaction {
               </form>
             </section>
 
-            <!-- Actions: Import/Export -->
+            <!-- Actions: Export -->
             <section class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-md">
-              <h2 class="text-2xl font-bold text-zinc-900 mb-4">Data Management</h2>
-              <div class="flex flex-col sm:flex-row gap-4 mb-4">
+              <h2 class="text-2xl font-bold text-zinc-900 mb-4">Export Data</h2>
+              <div class="flex flex-col sm:flex-row gap-4">
                 <button (click)="exportCSV()" class="flex-1 bg-teal-600 text-white font-bold py-3 px-4 rounded-md hover:bg-teal-700 transition-colors duration-200">Export as CSV</button>
                 <button (click)="exportPDF()" [disabled]="isPdfLoading()" class="flex-1 bg-purple-600 text-white font-bold py-3 px-4 rounded-md hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-wait transition-colors duration-200">
                   @if (isPdfLoading()) {
@@ -108,47 +100,37 @@ interface Transaction {
                   }
                 </button>
               </div>
-              <div class="flex-1 border-2 border-dashed border-zinc-300 rounded-md p-4 flex flex-col items-center justify-center mb-6">
-                <label for="csv-import" class="w-full cursor-pointer bg-zinc-600 text-white font-bold py-3 px-4 rounded-md hover:bg-zinc-700 transition-colors duration-200 text-center">
-                  Import from CSV (Replace)
-                </label>
-                <input id="csv-import" type="file" (change)="onFileSelected($event)" accept=".csv" class="hidden">
-                <p class="text-sm text-zinc-500 mt-2">This will replace all current data.</p>
-              </div>
-              
-              <!-- Destructive Actions -->
-              <div>
-                <h3 class="text-lg font-semibold text-zinc-700 mb-2">Danger Zone</h3>
-                @if (!confirmingReset()) {
-                  <button (click)="resetData()" class="w-full bg-red-600 text-white font-bold py-3 px-4 rounded-md hover:bg-red-700 transition-colors duration-200">
-                    Reset All Data
-                  </button>
-                  <p class="text-sm text-zinc-500 mt-2">This will permanently delete all transactions.</p>
-                } @else {
-                  <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md">
-                    <p class="font-bold mb-2">Are you sure?</p>
-                    <p class="text-sm">This action cannot be undone.</p>
-                  </div>
-                  <div class="mt-4 flex gap-4">
-                    <button (click)="confirmReset()" class="flex-1 bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200">
-                      Yes, Reset
-                    </button>
-                    <button (click)="cancelReset()" class="flex-1 bg-zinc-500 text-white font-bold py-2 px-4 rounded-md hover:bg-zinc-600 transition-colors duration-200">
-                      Cancel
-                    </button>
-                  </div>
-                }
-              </div>
             </section>
           </div>
           
           <!-- Right Column: Transaction List -->
           <div class="lg:col-span-3">
             <section class="bg-white p-4 sm:p-6 rounded-2xl border border-zinc-200 shadow-md">
-              <h2 class="text-2xl font-bold text-zinc-900 mb-4">History</h2>
-              @if (sortedTransactions().length === 0) {
+              <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+                  <h2 class="text-2xl font-bold text-zinc-900">History</h2>
+                  @if (availableMonths().length > 0) {
+                    <div class="mt-2 sm:mt-0">
+                      <label for="month-select" class="sr-only">Select Month</label>
+                      <select id="month-select" [value]="selectedMonth()" (change)="onMonthChange($event)" class="w-full sm:w-auto text-base bg-zinc-100 border-zinc-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-zinc-800 p-2">
+                        @for (month of availableMonths(); track month) {
+                          <option [value]="month">{{ formatMonth(month) }}</option>
+                        }
+                      </select>
+                    </div>
+                  }
+              </div>
+
+              @if (isLoading()) {
                 <div class="text-center py-10">
-                  <p class="text-zinc-500">No transactions yet. Add one to get started!</p>
+                  <p class="text-zinc-500">Loading transactions...</p>
+                  <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto mt-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+              } @else if (filteredAndSortedTransactions().length === 0) {
+                <div class="text-center py-10">
+                  <p class="text-zinc-500">No transactions found for {{ formatMonth(selectedMonth()) }}.</p>
                 </div>
               } @else {
                 <!-- Desktop Table View -->
@@ -163,7 +145,7 @@ interface Transaction {
                       </tr>
                     </thead>
                     <tbody>
-                      @for (tx of sortedTransactions(); track tx.id) {
+                      @for (tx of filteredAndSortedTransactions(); track tx.id) {
                         <tr class="border-b border-zinc-200 hover:bg-zinc-50">
                           <td class="p-4">{{ tx.date }}</td>
                           <td class="p-4">{{ tx.description }}</td>
@@ -185,7 +167,7 @@ interface Transaction {
 
                 <!-- Mobile Card View -->
                 <div class="md:hidden space-y-3">
-                  @for (tx of sortedTransactions(); track tx.id) {
+                  @for (tx of filteredAndSortedTransactions(); track tx.id) {
                     <div class="bg-zinc-100 p-4 rounded-lg flex justify-between items-center">
                       <div class="flex-1">
                         <p class="font-semibold">{{ tx.description }}</p>
@@ -205,9 +187,7 @@ interface Transaction {
               }
             </section>
           </div>
-
         </div>
-
       </div>
     </div>
   `,
@@ -215,32 +195,53 @@ interface Transaction {
   imports: [CommonModule, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AppComponent {
-  private readonly STORAGE_KEY = 'apartmentExpenses';
+export class AppComponent implements OnInit {
+  private transactionService = inject(TransactionService);
+  private fb = inject(FormBuilder);
+
   transactions: WritableSignal<Transaction[]> = signal([]);
+  isLoading = signal(true);
+  selectedMonth = signal<string>('');
   
   transactionForm: FormGroup;
   isPdfLoading = signal(false);
-  confirmingReset = signal(false);
 
-  // --- COMPUTED SIGNALS for reactive calculations ---
-  totalCredit = computed(() => this.transactions()
+  // --- DERIVED STATE FROM SIGNALS ---
+  
+  // Create a list of unique months (YYYY-MM) from transactions for the dropdown
+  availableMonths = computed(() => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const months = new Set(this.transactions().map(t => t.date.slice(0, 7)));
+    months.add(currentMonth); // Ensure current month is always an option
+    return Array.from(months).sort().reverse();
+  });
+
+  // Filter transactions based on the selected month
+  filteredTransactions = computed(() => {
+    const month = this.selectedMonth();
+    if (!month) return [];
+    return this.transactions().filter(t => t.date.startsWith(month));
+  });
+
+  // --- RECOMPUTE FINANCIALS based on FILTERED data ---
+  totalCredit = computed(() => this.filteredTransactions()
     .filter(t => t.type === 'credit')
     .reduce((sum, t) => sum + t.amount, 0)
   );
   
-  totalDebit = computed(() => this.transactions()
+  totalDebit = computed(() => this.filteredTransactions()
     .filter(t => t.type === 'debit')
     .reduce((sum, t) => sum + t.amount, 0)
   );
   
   balance = computed(() => this.totalCredit() - this.totalDebit());
   
-  sortedTransactions = computed(() => 
-    [...this.transactions()].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  // Sort the filtered transactions for display
+  filteredAndSortedTransactions = computed(() => 
+    [...this.filteredTransactions()].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   );
 
-  constructor(private fb: FormBuilder) {
+  constructor() {
     this.transactionForm = this.fb.group({
       date: [new Date().toISOString().substring(0, 10), Validators.required],
       description: ['', Validators.required],
@@ -248,11 +249,26 @@ export class AppComponent {
       type: ['debit' as 'credit' | 'debit', Validators.required]
     });
     
-    this.loadFromLocalStorage();
+    // Set default month to current month on initialization
+    this.selectedMonth.set(new Date().toISOString().slice(0, 7));
+  }
+  
+  ngOnInit(): void {
+    this.loadTransactions();
+  }
 
-    // Effect to automatically save to localStorage on change
-    effect(() => {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.transactions()));
+  loadTransactions(): void {
+    this.isLoading.set(true);
+    this.transactionService.getTransactions().subscribe({
+      next: (data) => {
+        this.transactions.set(data);
+        this.isLoading.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load transactions:', err);
+        alert('Could not load transaction data from the server.');
+        this.isLoading.set(false);
+      }
     });
   }
 
@@ -260,49 +276,54 @@ export class AppComponent {
   addTransaction(): void {
     if (this.transactionForm.invalid) return;
 
-    const newTransaction: Transaction = {
-      id: Date.now(),
-      ...this.transactionForm.value
-    };
+    const newTransactionData: NewTransaction = this.transactionForm.value;
 
-    this.transactions.update(current => [...current, newTransaction]);
-    this.transactionForm.reset({
-      date: new Date().toISOString().substring(0, 10),
-      description: '',
-      amount: null,
-      type: 'debit'
+    this.transactionService.addTransaction(newTransactionData).subscribe({
+      next: (addedTransaction) => {
+        this.transactions.update(current => [...current, addedTransaction]);
+        
+        // If a new transaction is for a new month, switch to it
+        const transactionMonth = addedTransaction.date.slice(0, 7);
+        if (this.selectedMonth() !== transactionMonth) {
+            this.selectedMonth.set(transactionMonth);
+        }
+
+        this.transactionForm.reset({
+          date: new Date().toISOString().substring(0, 10),
+          description: '',
+          amount: null,
+          type: 'debit'
+        });
+      },
+      error: (err) => {
+        console.error('Failed to add transaction:', err);
+        alert('Could not save the new transaction.');
+      }
     });
   }
 
   deleteTransaction(id: number): void {
-    this.transactions.update(current => current.filter(t => t.id !== id));
+    this.transactionService.deleteTransaction(id).subscribe({
+      next: () => {
+        this.transactions.update(current => current.filter(t => t.id !== id));
+      },
+      error: (err) => {
+        console.error('Failed to delete transaction:', err);
+        alert('Could not delete the transaction.');
+      }
+    });
   }
 
-  resetData(): void {
-    this.confirmingReset.set(true);
-  }
-
-  confirmReset(): void {
-    this.transactions.set([]);
-    this.confirmingReset.set(false);
-  }
-
-  cancelReset(): void {
-    this.confirmingReset.set(false);
-  }
-
-  // --- LOCAL STORAGE ---
-  private loadFromLocalStorage(): void {
-    const savedData = localStorage.getItem(this.STORAGE_KEY);
-    if (savedData) {
-      this.transactions.set(JSON.parse(savedData));
-    }
+  // --- EVENT HANDLERS ---
+  onMonthChange(event: Event): void {
+    const selectElement = event.target as HTMLSelectElement;
+    this.selectedMonth.set(selectElement.value);
   }
 
   // --- DATA EXPORT ---
   exportCSV(): void {
     const headers = ['id', 'date', 'description', 'amount', 'type'];
-    const rows = this.sortedTransactions().map(tx => 
+    const rows = this.filteredAndSortedTransactions().map(tx => 
       [tx.id, tx.date, this.escapeCsvField(tx.description), tx.amount, tx.type].join(',')
     );
     const csvContent = [headers.join(','), ...rows].join('\n');
@@ -346,7 +367,7 @@ export class AppComponent {
         doc.setFontSize(18);
         doc.setTextColor('#FFFFFF');
         doc.setFont('helvetica', 'bold');
-        doc.text('Aishwaryam Apartment Expense Report', pageMargin, 18);
+        doc.text(`Expense Report - ${this.formatMonth(this.selectedMonth())}`, pageMargin, 18);
         
         // --- SUMMARY SECTION ---
         finalY = 40;
@@ -371,48 +392,17 @@ export class AppComponent {
         doc.line(pageMargin, finalY, doc.internal.pageSize.width - pageMargin, finalY);
         finalY += 10;
         
-        // --- FILTER TRANSACTIONS ---
-        const creditTransactions = this.sortedTransactions().filter(tx => tx.type === 'credit');
-        const debitTransactions = this.sortedTransactions().filter(tx => tx.type === 'debit');
-
-        const addTable = (title: string, data: any[], color: string, startY: number) => {
-            doc.setFontSize(14);
-            doc.setTextColor(TEXT_COLOR);
-            doc.setFont('helvetica', 'bold');
-            doc.text(title, pageMargin, startY);
-
-            (doc as any).autoTable({
-                head: [['Date', 'Description', 'Amount']],
-                body: data,
-                startY: startY + 6,
-                theme: 'grid',
-                headStyles: { fillColor: color, textColor: '#FFFFFF' },
-                styles: { fontSize: 9, cellPadding: 2.5 },
-                columnStyles: { 2: { halign: 'right' } }
-            });
-            return (doc as any).autoTable.previous.finalY;
-        };
-
-        // --- CREDIT TABLE ---
-        if (creditTransactions.length > 0) {
-            const creditData = creditTransactions.map(tx => [tx.date, tx.description, formatAsINR(tx.amount)]);
-            finalY = addTable('Credit Transactions', creditData, CREDIT_COLOR, finalY) + 10;
-        }
-
-        // --- DEBIT TABLE ---
-        if (debitTransactions.length > 0) {
-            const debitData = debitTransactions.map(tx => [tx.date, tx.description, formatAsINR(tx.amount)]);
-            finalY = addTable('Debit Transactions', debitData, DEBIT_COLOR, finalY) + 10;
-        }
+        // --- GET DATA FOR THE SELECTED MONTH ---
+        const transactionsForPDF = this.filteredAndSortedTransactions();
         
-        // --- CONSOLIDATED HISTORY TABLE ---
-        if (this.sortedTransactions().length > 0) {
+        // --- TRANSACTION HISTORY TABLE ---
+        if (transactionsForPDF.length > 0) {
             doc.setFontSize(14);
             doc.setTextColor(TEXT_COLOR);
             doc.setFont('helvetica', 'bold');
-            doc.text('Consolidated Transaction History', pageMargin, finalY);
+            doc.text('Transaction History', pageMargin, finalY);
 
-            const allData = this.sortedTransactions().map(tx => [
+            const allData = transactionsForPDF.map(tx => [
                 tx.date,
                 tx.description,
                 tx.type.charAt(0).toUpperCase() + tx.type.slice(1),
@@ -441,6 +431,8 @@ export class AppComponent {
                     doc.text(`Page ${data.pageNumber}`, doc.internal.pageSize.width - pageMargin, pageHeight - 10, { align: 'right' });
                 }
             });
+        } else {
+             doc.text(`No transactions to report for ${this.formatMonth(this.selectedMonth())}.`, pageMargin, finalY);
         }
         
         doc.save(this.getExportFilename('pdf'));
@@ -452,80 +444,17 @@ export class AppComponent {
     }
   }
 
-  // --- DATA IMPORT ---
-  onFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (!input.files?.length) return;
-
-    const file = input.files[0];
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      this.parseAndImportCSV(text);
-    };
-    
-    reader.readAsText(file);
-    input.value = ''; // Reset input so same file can be selected again
-  }
-  
-  private parseAndImportCSV(csvText: string): void {
-    try {
-      const lines = csvText.split('\n');
-      if (lines.length < 1) {
-          throw new Error("CSV file is empty or invalid.");
-      }
-      const headers = lines[0].trim().toLowerCase().split(',');
-      const requiredHeaders = ['date', 'description', 'amount', 'type'];
-      if (!requiredHeaders.every(h => headers.includes(h))) {
-        throw new Error(`CSV must contain the following headers: ${requiredHeaders.join(', ')}`);
-      }
-
-      const importedTransactions: Transaction[] = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        // Basic CSV parsing that handles quoted commas
-        const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
-        
-        const transactionData: any = {};
-        headers.forEach((header, index) => {
-          let value = (values[index] || '').trim();
-          if (value.startsWith('"') && value.endsWith('"')) {
-            value = value.slice(1, -1).replace(/""/g, '"');
-          }
-          transactionData[header] = value;
-        });
-
-        const transaction: Transaction = {
-          id: Date.now() + i,
-          date: transactionData.date,
-          description: transactionData.description,
-          amount: parseFloat(transactionData.amount),
-          type: transactionData.type.toLowerCase() === 'credit' ? 'credit' : 'debit'
-        };
-
-        if (transaction.date && transaction.description && !isNaN(transaction.amount) && transaction.amount > 0) {
-          importedTransactions.push(transaction);
-        }
-      }
-      
-      this.transactions.set(importedTransactions);
-      alert(`Import successful! ${importedTransactions.length} transactions have been loaded, replacing all previous data.`);
-    } catch (error) {
-      console.error('Error parsing CSV:', error);
-      alert(`Failed to parse CSV file. ${error instanceof Error ? error.message : 'Please ensure it is in the correct format.'}`);
-    }
-  }
-
   // --- HELPERS ---
+  formatMonth(yyyyMM: string): string {
+    if (!yyyyMM) return '';
+    const [year, month] = yyyyMM.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1);
+    return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+  }
+
   private getExportFilename(extension: 'csv' | 'pdf'): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    return `transactions_${year}-${month}.${extension}`;
+    const monthStr = this.selectedMonth().replace('-', '_');
+    return `transactions_${monthStr}.${extension}`;
   }
 
   private downloadFile(content: string, mimeType: string, filename: string): void {
