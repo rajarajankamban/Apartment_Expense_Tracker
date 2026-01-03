@@ -222,12 +222,12 @@ export class AppComponent implements OnInit {
 
   totalCredit = computed(() => this.filteredTransactions()
     .filter(t => t.type === 'credit')
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + Number(t.amount), 0)
   );
   
   totalDebit = computed(() => this.filteredTransactions()
     .filter(t => t.type === 'debit')
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + Number(t.amount), 0)
   );
   
   balance = computed(() => this.totalCredit() - this.totalDebit());
@@ -345,7 +345,7 @@ export class AppComponent implements OnInit {
         const FOOTER_BG_COLOR = '#f1f5f9';
         const pageMargin = 14;
 
-        const formatAsINR = (amount: number) => `INR ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const formatAsINR = (amount: number | string) => `INR ${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         const generatedDate = new Date().toLocaleDateString('en-GB');
 
         // --- PDF HEADER ---
@@ -507,7 +507,6 @@ export class AppComponent implements OnInit {
   // --- HELPERS ---
   formatMonth(yyyyMM: string): string {
     if (!yyyyMM) return '';
-    // FIX: Corrected typo `yyyM` to the correct parameter name `yyyyMM`.
     const [year, month] = yyyyMM.split('-');
     const date = new Date(parseInt(year), parseInt(month) - 1);
     return date.toLocaleString('default', { month: 'long', year: 'numeric' });
