@@ -147,7 +147,7 @@ import { Transaction, NewTransaction, TransactionService } from './transaction.s
                     <tbody>
                       @for (tx of filteredAndSortedTransactions(); track tx.id) {
                         <tr class="border-b border-zinc-200 hover:bg-zinc-50">
-                          <td class="p-4">{{ tx.date }}</td>
+                          <td class="p-4">{{ formatDateForDisplay(tx.date) }}</td>
                           <td class="p-4">{{ tx.description }}</td>
                           <td class="p-4 text-right font-mono" [class.text-green-600]="tx.type === 'credit'" [class.text-red-600]="tx.type === 'debit'">
                             {{ (tx.type === 'credit' ? '+' : '-') }} {{ tx.amount | currency:'INR' }}
@@ -171,7 +171,7 @@ import { Transaction, NewTransaction, TransactionService } from './transaction.s
                     <div class="bg-zinc-100 p-4 rounded-lg flex justify-between items-center">
                       <div class="flex-1">
                         <p class="font-semibold">{{ tx.description }}</p>
-                        <p class="text-sm text-zinc-500">{{ tx.date }}</p>
+                        <p class="text-sm text-zinc-500">{{ formatDateForDisplay(tx.date) }}</p>
                       </div>
                       <div class="text-right ml-4">
                         <p class="font-bold text-lg" [class.text-green-600]="tx.type === 'credit'" [class.text-red-600]="tx.type === 'debit'">
@@ -208,22 +208,19 @@ export class AppComponent implements OnInit {
 
   // --- DERIVED STATE FROM SIGNALS ---
   
-  // Create a list of unique months (YYYY-MM) from transactions for the dropdown
   availableMonths = computed(() => {
     const currentMonth = new Date().toISOString().slice(0, 7);
     const months = new Set(this.transactions().map(t => t.date.slice(0, 7)));
-    months.add(currentMonth); // Ensure current month is always an option
+    months.add(currentMonth);
     return Array.from(months).sort().reverse();
   });
 
-  // Filter transactions based on the selected month
   filteredTransactions = computed(() => {
     const month = this.selectedMonth();
     if (!month) return [];
     return this.transactions().filter(t => t.date.startsWith(month));
   });
 
-  // --- RECOMPUTE FINANCIALS based on FILTERED data ---
   totalCredit = computed(() => this.filteredTransactions()
     .filter(t => t.type === 'credit')
     .reduce((sum, t) => sum + t.amount, 0)
@@ -236,7 +233,6 @@ export class AppComponent implements OnInit {
   
   balance = computed(() => this.totalCredit() - this.totalDebit());
   
-  // Sort the filtered transactions for display
   filteredAndSortedTransactions = computed(() => 
     [...this.filteredTransactions()].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   );
@@ -249,7 +245,6 @@ export class AppComponent implements OnInit {
       type: ['debit' as 'credit' | 'debit', Validators.required]
     });
     
-    // Set default month to current month on initialization
     this.selectedMonth.set(new Date().toISOString().slice(0, 7));
   }
   
@@ -272,22 +267,16 @@ export class AppComponent implements OnInit {
     });
   }
 
-  // --- CRUD OPERATIONS ---
   addTransaction(): void {
     if (this.transactionForm.invalid) return;
-
     const newTransactionData: NewTransaction = this.transactionForm.value;
-
     this.transactionService.addTransaction(newTransactionData).subscribe({
       next: (addedTransaction) => {
         this.transactions.update(current => [...current, addedTransaction]);
-        
-        // If a new transaction is for a new month, switch to it
         const transactionMonth = addedTransaction.date.slice(0, 7);
         if (this.selectedMonth() !== transactionMonth) {
             this.selectedMonth.set(transactionMonth);
         }
-
         this.transactionForm.reset({
           date: new Date().toISOString().substring(0, 10),
           description: '',
@@ -314,17 +303,15 @@ export class AppComponent implements OnInit {
     });
   }
 
-  // --- EVENT HANDLERS ---
   onMonthChange(event: Event): void {
     const selectElement = event.target as HTMLSelectElement;
     this.selectedMonth.set(selectElement.value);
   }
 
-  // --- DATA EXPORT ---
   exportCSV(): void {
     const headers = ['id', 'date', 'description', 'amount', 'type'];
     const rows = this.filteredAndSortedTransactions().map(tx => 
-      [tx.id, tx.date, this.escapeCsvField(tx.description), tx.amount, tx.type].join(',')
+      [tx.id, this.formatDateForDisplay(tx.date), this.escapeCsvField(tx.description), tx.amount, tx.type].join(',')
     );
     const csvContent = [headers.join(','), ...rows].join('\n');
     this.downloadFile(csvContent, 'text/csv', this.getExportFilename('csv'));
@@ -344,20 +331,20 @@ export class AppComponent implements OnInit {
         
         const { jsPDF } = (window as any).jspdf;
         const doc = new jsPDF();
-        const pageHeight = doc.internal.pageSize.height;
-        let finalY = 0; // Keep track of the vertical position
+        let finalY = 0;
 
-        // --- STYLING CONSTANTS ---
-        const HEADER_COLOR = '#27374D'; // Dark Blue
-        const CREDIT_COLOR = '#166534'; // Dark Green
-        const DEBIT_COLOR = '#991B1B';  // Dark Red
-        const PRIMARY_COLOR = '#1E40AF'; // Blue
-        const TEXT_COLOR = '#333333';
-        const SUBTLE_TEXT_COLOR = '#666666';
-        const BORDER_COLOR = '#DDDDDD';
+        // --- STYLING & FORMATTERS ---
+        const HEADER_COLOR = '#0F172A';
+        const CREDIT_HEADER_COLOR = '#166534';
+        const DEBIT_HEADER_COLOR = '#991B1B';
+        const CONSOLIDATED_HEADER_COLOR = '#1E40AF';
+        const CREDIT_COLOR = '#15803d';
+        const DEBIT_COLOR = '#b91c1c';
+        const TEXT_COLOR = '#1e293b';
+        const SUBTLE_TEXT_COLOR = '#64748b';
+        const BORDER_COLOR = '#e2e8f0';
         const pageMargin = 14;
 
-        // --- FORMATTERS ---
         const formatAsINR = (amount: number) => `INR ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         const generatedDate = new Date().toLocaleDateString('en-GB');
 
@@ -367,7 +354,7 @@ export class AppComponent implements OnInit {
         doc.setFontSize(18);
         doc.setTextColor('#FFFFFF');
         doc.setFont('helvetica', 'bold');
-        doc.text(`Expense Report - ${this.formatMonth(this.selectedMonth())}`, pageMargin, 18);
+        doc.text('Apartment Expense Report', pageMargin, 18);
         
         // --- SUMMARY SECTION ---
         finalY = 40;
@@ -384,55 +371,104 @@ export class AppComponent implements OnInit {
         doc.text(formatAsINR(this.totalCredit()), pageMargin, finalY + 7);
         doc.setTextColor(DEBIT_COLOR);
         doc.text(formatAsINR(this.totalDebit()), 80, finalY + 7);
-        doc.setTextColor(this.balance() >= 0 ? PRIMARY_COLOR : DEBIT_COLOR);
+        doc.setTextColor(this.balance() >= 0 ? CONSOLIDATED_HEADER_COLOR : DEBIT_COLOR);
         doc.text(formatAsINR(this.balance()), 145, finalY + 7);
         
         finalY += 15;
         doc.setDrawColor(BORDER_COLOR);
         doc.line(pageMargin, finalY, doc.internal.pageSize.width - pageMargin, finalY);
-        finalY += 10;
+        finalY += 12;
         
-        // --- GET DATA FOR THE SELECTED MONTH ---
         const transactionsForPDF = this.filteredAndSortedTransactions();
-        
-        // --- TRANSACTION HISTORY TABLE ---
-        if (transactionsForPDF.length > 0) {
+        const creditTransactions = transactionsForPDF.filter(tx => tx.type === 'credit');
+        const debitTransactions = transactionsForPDF.filter(tx => tx.type === 'debit');
+
+        const autoTableConfig = {
+            theme: 'grid',
+            styles: { fontSize: 9, cellPadding: 2.5 },
+            margin: { left: pageMargin, right: pageMargin },
+            didDrawPage: (data: any) => {
+                const pageHeight = doc.internal.pageSize.height;
+                doc.setFontSize(8);
+                doc.setTextColor(SUBTLE_TEXT_COLOR);
+                doc.text(`Report for ${this.formatMonth(this.selectedMonth())} | Generated on ${generatedDate}`, pageMargin, pageHeight - 10);
+                doc.text(`Page ${data.pageNumber}`, doc.internal.pageSize.width - pageMargin, pageHeight - 10, { align: 'right' });
+            }
+        };
+
+        if (transactionsForPDF.length === 0) {
+            doc.text(`No transactions to report for ${this.formatMonth(this.selectedMonth())}.`, pageMargin, finalY);
+        } else {
+            // --- CREDIT TRANSACTIONS TABLE ---
+            if (creditTransactions.length > 0) {
+                doc.setFontSize(14);
+                doc.setTextColor(TEXT_COLOR);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Credit Transactions', pageMargin, finalY);
+                finalY += 6;
+
+                (doc as any).autoTable({
+                    ...autoTableConfig,
+                    head: [['Date', 'Description', 'Amount']],
+                    body: creditTransactions.map(tx => [this.formatDateForDisplay(tx.date), tx.description, formatAsINR(tx.amount)]),
+                    startY: finalY,
+                    headStyles: { fillColor: CREDIT_HEADER_COLOR, textColor: '#FFFFFF' },
+                    columnStyles: { 2: { halign: 'right' } },
+                    didDrawCell: (data: any) => {
+                        if (data.section === 'body' && data.column.index === 2) doc.setTextColor(CREDIT_COLOR);
+                    },
+                });
+                finalY = (doc as any).lastAutoTable.finalY + 12;
+            }
+            
+            // --- DEBIT TRANSACTIONS TABLE ---
+            if (debitTransactions.length > 0) {
+                doc.setFontSize(14);
+                doc.setTextColor(TEXT_COLOR);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Debit Transactions', pageMargin, finalY);
+                finalY += 6;
+                
+                (doc as any).autoTable({
+                    ...autoTableConfig,
+                    head: [['Date', 'Description', 'Amount']],
+                    body: debitTransactions.map(tx => [this.formatDateForDisplay(tx.date), tx.description, formatAsINR(tx.amount)]),
+                    startY: finalY,
+                    headStyles: { fillColor: DEBIT_HEADER_COLOR, textColor: '#FFFFFF' },
+                    columnStyles: { 2: { halign: 'right' } },
+                    didDrawCell: (data: any) => {
+                        if (data.section === 'body' && data.column.index === 2) doc.setTextColor(DEBIT_COLOR);
+                    },
+                });
+                finalY = (doc as any).lastAutoTable.finalY + 12;
+            }
+
+            // --- CONSOLIDATED TRANSACTION HISTORY ---
             doc.setFontSize(14);
             doc.setTextColor(TEXT_COLOR);
             doc.setFont('helvetica', 'bold');
-            doc.text('Transaction History', pageMargin, finalY);
+            doc.text('Consolidated Transaction History', pageMargin, finalY);
+            finalY += 6;
 
-            const allData = transactionsForPDF.map(tx => [
-                tx.date,
-                tx.description,
-                tx.type.charAt(0).toUpperCase() + tx.type.slice(1),
-                `${tx.type === 'credit' ? '+' : '-'} ${formatAsINR(tx.amount)}`
-            ]);
-            
             (doc as any).autoTable({
+                ...autoTableConfig,
                 head: [['Date', 'Description', 'Type', 'Amount']],
-                body: allData,
-                startY: finalY + 6,
-                theme: 'grid',
-                headStyles: { fillColor: PRIMARY_COLOR, textColor: '#FFFFFF' },
-                styles: { fontSize: 9, cellPadding: 2.5 },
+                body: transactionsForPDF.map(tx => [
+                    this.formatDateForDisplay(tx.date),
+                    tx.description,
+                    tx.type.charAt(0).toUpperCase() + tx.type.slice(1),
+                    `${tx.type === 'credit' ? '+' : '-'} ${formatAsINR(tx.amount)}`
+                ]),
+                startY: finalY,
+                headStyles: { fillColor: CONSOLIDATED_HEADER_COLOR, textColor: '#FFFFFF' },
                 columnStyles: { 3: { halign: 'right' } },
                 didDrawCell: (data: any) => {
                     if (data.section === 'body' && data.column.index === 3) {
-                        const text = data.cell.raw as string;
+                        const text = String(data.cell.raw);
                         doc.setTextColor(text.trim().startsWith('+') ? CREDIT_COLOR : DEBIT_COLOR);
                     }
                 },
-                didDrawPage: (data: any) => {
-                    // --- FOOTER ---
-                    doc.setFontSize(8);
-                    doc.setTextColor(SUBTLE_TEXT_COLOR);
-                    doc.text(`Report generated on ${generatedDate}`, pageMargin, pageHeight - 10);
-                    doc.text(`Page ${data.pageNumber}`, doc.internal.pageSize.width - pageMargin, pageHeight - 10, { align: 'right' });
-                }
             });
-        } else {
-             doc.text(`No transactions to report for ${this.formatMonth(this.selectedMonth())}.`, pageMargin, finalY);
         }
         
         doc.save(this.getExportFilename('pdf'));
@@ -450,6 +486,17 @@ export class AppComponent implements OnInit {
     const [year, month] = yyyyMM.split('-');
     const date = new Date(parseInt(year), parseInt(month) - 1);
     return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+  }
+
+  formatDateForDisplay(dateString: string): string {
+    if (!dateString) return '';
+    // Handles both 'YYYY-MM-DD' and ISO strings by taking the first 10 characters
+    const datePart = dateString.substring(0, 10);
+    const [year, month, day] = datePart.split('-');
+    if (year && month && day && year.length === 4) {
+        return `${day}-${month}-${year}`;
+    }
+    return dateString; // Fallback to original string if format is unexpected
   }
 
   private getExportFilename(extension: 'csv' | 'pdf'): string {
