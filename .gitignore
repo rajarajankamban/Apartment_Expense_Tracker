@@ -23,4 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 .angular/
-.vercel
+
+
+# Vercel / Environment variables
+.vercel/
+.env
+.env*.local
+
+

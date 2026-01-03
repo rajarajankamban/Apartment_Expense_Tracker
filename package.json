@@ -20,12 +20,15 @@
     "@vercel/node": "^5.5.16",
     "@vercel/postgres": "^0.10.0",
     "rxjs": "^7.8.2",
-    "tailwindcss": "latest"
+    "tailwindcss": "latest",
+    "pg": "^8.12.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "angular-cli-ghpages": "^2.0.3",
     "typescript": "^5.9.3",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "@types/pg": "^8.11.6",
+    "@vercel/node": "^3.2.0"
   }
 }

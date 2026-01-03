@@ -1,6 +1,11 @@
 import { Pool } from 'pg';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+// This check provides a clear error message if the database connection string is missing.
+if (!process.env.POSTGRES_URL) {
+  throw new Error('DATABASE_URL environment variable is not set.');
+}
+
 // Initialize a connection pool.
 // The 'pg' library automatically reads connection details
 // from environment variables like POSTGRES_URL.

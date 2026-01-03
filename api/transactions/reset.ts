@@ -1,6 +1,10 @@
 import { Pool } from 'pg';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+if (!process.env.POSTGRES_URL) {
+  throw new Error('DATABASE_URL environment variable is not set.');
+}
+
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
 });
