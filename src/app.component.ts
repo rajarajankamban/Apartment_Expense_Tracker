@@ -191,7 +191,6 @@ import { Transaction, NewTransaction, TransactionService } from './transaction.s
       </div>
     </div>
   `,
-  standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -343,6 +342,7 @@ export class AppComponent implements OnInit {
         const TEXT_COLOR = '#1e293b';
         const SUBTLE_TEXT_COLOR = '#64748b';
         const BORDER_COLOR = '#e2e8f0';
+        const FOOTER_BG_COLOR = '#f1f5f9';
         const pageMargin = 14;
 
         const formatAsINR = (amount: number) => `INR ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -411,11 +411,19 @@ export class AppComponent implements OnInit {
                     ...autoTableConfig,
                     head: [['Date', 'Description', 'Amount']],
                     body: creditTransactions.map(tx => [this.formatDateForDisplay(tx.date), tx.description, formatAsINR(tx.amount)]),
+                    foot: [['', 'Total', formatAsINR(this.totalCredit())]],
+                    footStyles: { fontStyle: 'bold', fillColor: FOOTER_BG_COLOR },
                     startY: finalY,
                     headStyles: { fillColor: CREDIT_HEADER_COLOR, textColor: '#FFFFFF' },
                     columnStyles: { 2: { halign: 'right' } },
                     didDrawCell: (data: any) => {
-                        if (data.section === 'body' && data.column.index === 2) doc.setTextColor(CREDIT_COLOR);
+                        if (data.section === 'body' && data.column.index === 2) {
+                            doc.setTextColor(CREDIT_COLOR);
+                        }
+                        if (data.section === 'foot') {
+                            if (data.column.index === 1) data.cell.styles.halign = 'right';
+                            if (data.column.index === 2) doc.setTextColor(CREDIT_COLOR);
+                        }
                     },
                 });
                 finalY = (doc as any).lastAutoTable.finalY + 12;
@@ -433,11 +441,19 @@ export class AppComponent implements OnInit {
                     ...autoTableConfig,
                     head: [['Date', 'Description', 'Amount']],
                     body: debitTransactions.map(tx => [this.formatDateForDisplay(tx.date), tx.description, formatAsINR(tx.amount)]),
+                    foot: [['', 'Total', formatAsINR(this.totalDebit())]],
+                    footStyles: { fontStyle: 'bold', fillColor: FOOTER_BG_COLOR },
                     startY: finalY,
                     headStyles: { fillColor: DEBIT_HEADER_COLOR, textColor: '#FFFFFF' },
                     columnStyles: { 2: { halign: 'right' } },
                     didDrawCell: (data: any) => {
-                        if (data.section === 'body' && data.column.index === 2) doc.setTextColor(DEBIT_COLOR);
+                        if (data.section === 'body' && data.column.index === 2) {
+                            doc.setTextColor(DEBIT_COLOR);
+                        }
+                        if (data.section === 'foot') {
+                            if (data.column.index === 1) data.cell.styles.halign = 'right';
+                            if (data.column.index === 2) doc.setTextColor(DEBIT_COLOR);
+                        }
                     },
                 });
                 finalY = (doc as any).lastAutoTable.finalY + 12;
@@ -459,6 +475,8 @@ export class AppComponent implements OnInit {
                     tx.type.charAt(0).toUpperCase() + tx.type.slice(1),
                     `${tx.type === 'credit' ? '+' : '-'} ${formatAsINR(tx.amount)}`
                 ]),
+                foot: [['', '', 'Balance', formatAsINR(this.balance())]],
+                footStyles: { fontStyle: 'bold', fillColor: FOOTER_BG_COLOR },
                 startY: finalY,
                 headStyles: { fillColor: CONSOLIDATED_HEADER_COLOR, textColor: '#FFFFFF' },
                 columnStyles: { 3: { halign: 'right' } },
@@ -466,6 +484,12 @@ export class AppComponent implements OnInit {
                     if (data.section === 'body' && data.column.index === 3) {
                         const text = String(data.cell.raw);
                         doc.setTextColor(text.trim().startsWith('+') ? CREDIT_COLOR : DEBIT_COLOR);
+                    }
+                    if (data.section === 'foot') {
+                        if (data.column.index === 2) data.cell.styles.halign = 'right';
+                        if (data.column.index === 3) {
+                            doc.setTextColor(this.balance() >= 0 ? CONSOLIDATED_HEADER_COLOR : DEBIT_COLOR);
+                        }
                     }
                 },
             });
@@ -483,6 +507,7 @@ export class AppComponent implements OnInit {
   // --- HELPERS ---
   formatMonth(yyyyMM: string): string {
     if (!yyyyMM) return '';
+    // FIX: Corrected typo `yyyM` to the correct parameter name `yyyyMM`.
     const [year, month] = yyyyMM.split('-');
     const date = new Date(parseInt(year), parseInt(month) - 1);
     return date.toLocaleString('default', { month: 'long', year: 'numeric' });
