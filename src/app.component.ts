@@ -412,7 +412,7 @@ export class AppComponent implements OnInit {
                     head: [['Date', 'Description', 'Amount']],
                     body: creditTransactions.map(tx => [this.formatDateForDisplay(tx.date), tx.description, formatAsINR(tx.amount)]),
                     foot: [['', 'Total', formatAsINR(this.totalCredit())]],
-                    footStyles: { fontStyle: 'bold', fillColor: FOOTER_BG_COLOR },
+                    footStyles: { fontStyle: 'bold', fillColor: FOOTER_BG_COLOR, textColor: '#666' },
                     startY: finalY,
                     headStyles: { fillColor: CREDIT_HEADER_COLOR, textColor: '#FFFFFF' },
                     columnStyles: { 2: { halign: 'right' } },
