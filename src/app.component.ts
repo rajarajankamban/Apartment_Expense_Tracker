@@ -442,7 +442,7 @@ export class AppComponent implements OnInit {
                     head: [['Date', 'Description', 'Amount']],
                     body: debitTransactions.map(tx => [this.formatDateForDisplay(tx.date), tx.description, formatAsINR(tx.amount)]),
                     foot: [['', 'Total', formatAsINR(this.totalDebit())]],
-                    footStyles: { fontStyle: 'bold', fillColor: FOOTER_BG_COLOR },
+                    footStyles: { fontStyle: 'bold', fillColor: FOOTER_BG_COLOR, textColor: '#666' },
                     startY: finalY,
                     headStyles: { fillColor: DEBIT_HEADER_COLOR, textColor: '#FFFFFF' },
                     columnStyles: { 2: { halign: 'right' } },
@@ -476,7 +476,7 @@ export class AppComponent implements OnInit {
                     `${tx.type === 'credit' ? '+' : '-'} ${formatAsINR(tx.amount)}`
                 ]),
                 foot: [['', '', 'Balance', formatAsINR(this.balance())]],
-                footStyles: { fontStyle: 'bold', fillColor: FOOTER_BG_COLOR },
+                footStyles: { fontStyle: 'bold', fillColor: FOOTER_BG_COLOR, textColor: '#666' },
                 startY: finalY,
                 headStyles: { fillColor: CONSOLIDATED_HEADER_COLOR, textColor: '#FFFFFF' },
                 columnStyles: { 3: { halign: 'right' } },
